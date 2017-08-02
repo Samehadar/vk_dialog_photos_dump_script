@@ -80,7 +80,7 @@ for href in test:
     try:
         urllib.request.urlretrieve(href, str(file_num) + ".jpg")
     except:
-        print("Не удалось скачать изображение по ссылке: " + str(file_num))
+        print("Не удалось скачать изображение по ссылке: " + str(href))
     file_num += 1
     print("Скачано " + str(file_num) + " файлов\n")
 test.close()

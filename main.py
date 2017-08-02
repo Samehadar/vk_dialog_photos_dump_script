@@ -4,7 +4,7 @@ import requests
 import re
 import sys
 import os
-import urllib
+import urllib.request
 import json
 
 # argv[1] = remixsid_cookie
@@ -12,10 +12,10 @@ import json
 # argv[3] = person_name
 
 def printHelp():
-    print """
+    print("""
     Usage: python main.py <remixsid_cookie> <dialog_id> <name_of_folder>
     <dialog_id> is a string parameter "sel" in address line which you see when open a dialog
-    """
+    """)
 
 try:
     sys.argv[1]
@@ -28,9 +28,9 @@ if( sys.argv[1] == '--help' ):
     exit()
 else:
     if( len(sys.argv) < 4 ):
-        print """
+        print("""
         Invalid number of arguments. Use parameter --help to know more
-        """
+        """)
         exit()
 
 remixsid_cookie = sys.argv[1]
@@ -50,11 +50,11 @@ bound = {"count" : 10000, "offset" : 0}
 try:
     os.mkdir("drop_" + sys.argv[3])
 except OSError:
-    print "Проблемы с созданием папки 'drop_" + sys.argv[3] + "'"
+    print("Проблемы с созданием папки 'drop_" + sys.argv[3] + "'")
 if( os.path.exists("drop_" + sys.argv[3]) ):
     os.chdir("drop_" + sys.argv[3])
 else:
-    print "Не удалось создать папку\n"
+    print("Не удалось создать папку\n")
     exit()
 
 test = open("links", "w")
@@ -66,18 +66,21 @@ while( bound['offset'] < bound['count'] ):
     bound['count'] = int(bound['count'])
     bound['offset'] = int(bound['offset'])
 
-    links = re.compile('&quot;http://cs.+?"').findall(content)
+    links = re.compile('http://cs.+?"').findall(content)
 
     for st in links:
-        st = st.replace("&quot;,&quot;x_&quot;:[&quot;", "")
-        test.write(st[6:st.find("&quot;", 6)] + '.jpg\n')
+        st = st.replace("&quot;,&quot;x_&quot;:[&quot;", "").replace("\"", "").split(");")[0]
+        test.write(st + '\n')
 
 test.close()
 
 test = open("links", "r")
 file_num = 0
 for href in test:
-    urllib.urlretrieve(href, str(file_num) + ".jpg")
+    try:
+        urllib.request.urlretrieve(href, str(file_num) + ".jpg")
+    except:
+        print("Не удалось скачать изображение по ссылке: " + str(file_num))
     file_num += 1
-    print "Скачано " + str(file_num) + " файлов\n"
+    print("Скачано " + str(file_num) + " файлов\n")
 test.close()

@@ -32,7 +32,19 @@ def downloadMaxAvailableSizePhoto(my_jsons: list, photo: str):
     for my_json in my_jsons:
         if (my_json.get("id").__contains__(photo)):
             server = re.findall("\d+",my_json.get("base")).pop()
-            z_src = my_json.get("z_").__getitem__(0) + ".jpg"
+            z_src = my_json.get("z_",
+                        my_json.get("y_",
+                            my_json.get("x_",
+                                my_json.get("r_",
+                                    my_json.get("q_",
+                                        my_json.get("p_",
+                                            my_json.get("o_")
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ).__getitem__(0) + ".jpg"
             res_url = default_domain + server + "/" + z_src
             urllib.request.urlretrieve(res_url, str(photo) + ".jpg")
 
@@ -128,16 +140,40 @@ for photo, mail in zip(photos, mails_file):
             content = content.replace(trash, "")
         content = content[1:]
         raw_jsons = re.findall("{\"id[^}]+\S+}", content)
-        jsons = [json.loads(raw) for raw in raw_jsons]
+    # TODO:: Now I remove all this fields, becausse I'm noob in python and dont know how to remove \" from string (it is escaping symbols)
+    #
+    # "comments":"<div id=\"pv_comments\" class=\"pv_comments wall_module\">\n  <div id=\"pv_comments_header\" onclick=\"Photoview.comments();\" class=\"pv_comments_header unshown\">\n  <div id=\"pv_comments_list\" class=\"pv_comments_list  unshown\">\n  <div class=\"pv_no_commments_placeholder_wrap\">\n    <div class=\"pv_no_commments_placeholder no_rows unshown\">Be the first to comment on this photo.\n    <div class=\"pv_closed_commments_placeholder no_rows \">Commenting this photo is restricted.\n  \n",
+    # "reply_form":"",
+    # "reply_options":[],
+    # "date":"<span class=\"rel_date\">5 Jan at 3:21 pm",         -  it's line not parsed
+    # "tags":[0],
+    # "tagged":[],
+    # "album":"<a href=\"\/album15424323_0\" onclick=\"return nav.go(this,
+    # event)\">Untitled",
+    # "author":"<a class=\"mem_link\" href=\"\/mister.cat\">Mister Cat",
+    # "author_photo":"\/images\/camera_50.png",
+    # "author_href":"\/mister.cat",
+
+        # todo:: mb just try to parse json and if any problem catch exception and then work with hidden_trash?
+        jsons = []
+        for raw in raw_jsons:
+            if (len(re.findall("\"id\":\"-+\d+_\d+\"", raw)) > 0):
+                print("Не удалось скачать изображение: " + re.findall("\"id\":\"-+\d+_\d+\"", raw).pop())
+                print("Пока нет возможности скачать изображения присланные из сообществ\n")
+                # todo:: add saving broken id to file
+            else:
+                hidden_trash = re.findall("<[^@]+>", raw)
+                h_trash = hidden_trash.pop()
+                jsons.append(json.loads(raw.replace(h_trash, "")))
 
         if (photo.__contains__(user_id)):
             downloadOriginPhoto(jsons, photo.replace("\n", ""))
         else:
             downloadMaxAvailableSizePhoto(jsons, photo.replace("\n", ""))
 
+        print("Скачано " + str(file_num) + " файлов\n")
     except:
         print("Не удалось скачать изображение по ссылке: " + str(photo.replace("\n", "")))
     file_num += 1
-    print("Скачано " + str(file_num) + " файлов\n")
 photos.close()
 mails_file.close()

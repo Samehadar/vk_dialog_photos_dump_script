@@ -22,11 +22,16 @@ default_domain_for_origin = "http://127.0.0.1/"
 def downloadOriginPhoto(my_jsons: list, photo: str):
     for my_json in my_jsons:
         if (my_json.get("id").__contains__(photo)):
-            server = str(my_json.get("rotate").get("server"))
-            orig_url = my_json.get("rotate").get("orig_url")
-            res_url = default_domain + server + "/" + orig_url.replace(default_domain_for_origin, "")
-            urllib.request.urlretrieve(res_url, str(photo) + ".jpg")
-
+            try:
+                server = str(my_json.get("rotate").get("server"))
+                orig_url = my_json.get("rotate").get("orig_url")
+                res_url = default_domain + server + "/" + orig_url.replace(default_domain_for_origin, "")
+                urllib.request.urlretrieve(res_url, str(photo) + ".jpg")
+            except:
+                print("""Похоже что мне попалось shared photo!
+Доступа к оригинальному изображению получить не удалось, но я попробую скачать максимально возможное разрешение фотографии..
+                """)
+                downloadMaxAvailableSizePhoto(my_jsons, photo)
 
 def downloadMaxAvailableSizePhoto(my_jsons: list, photo: str):
     for my_json in my_jsons:
@@ -102,7 +107,7 @@ while( bound['offset'] < bound['count'] ):
     bound['offset'] = int(bound['offset'])
 
     links = re.compile('http://cs.+?"').findall(content)
-    photo_refs = re.compile("""\('\d+_+\d+',""").findall(content) # - 123123_231231 -pattern
+    photo_refs = re.compile("""\('-?\d+_+\d+',""").findall(content) # 123123_231231 -pattern (for image for groups -123123_231231)
     mails = re.compile("""'mail\d+'""").findall(content) # - mail123123 - pattern
 
     for st in links:
@@ -119,6 +124,7 @@ test.close()
 mails_file.close()
 photos.close()
 
+single_json_regex = r"""{"id":"{1}.+?\"o_??.+?]}""" # todo:: if I'll search with this pattern + photo_id then I can work with single json instead of list of json
 
 photos = open("photos.txt", "r")
 mails_file = open("mails.txt", "r")
@@ -134,12 +140,13 @@ for photo, mail in zip(photos, mails_file):
         "photo": photo.replace("\n", "")
     }
     try:
-        content = requests.post(request_full_size_image_href, cookies={"remixsid": remixsid_cookie}, params=RequestDataFullSize).text
+        response = requests.post(request_full_size_image_href, cookies={"remixsid": remixsid_cookie}, params=RequestDataFullSize)
+        content = response.text
         xml_trash = re.findall("<{1}\S*>{1}", content)
         for trash in xml_trash:
             content = content.replace(trash, "")
         content = content[1:]
-        raw_jsons = re.findall("{\"id[^}]+\S+}", content)
+        raw_jsons = re.findall(single_json_regex, content)
     # TODO:: Now I remove all this fields, becausse I'm noob in python and dont know how to remove \" from string (it is escaping symbols)
     #
     # "comments":"<div id=\"pv_comments\" class=\"pv_comments wall_module\">\n  <div id=\"pv_comments_header\" onclick=\"Photoview.comments();\" class=\"pv_comments_header unshown\">\n  <div id=\"pv_comments_list\" class=\"pv_comments_list  unshown\">\n  <div class=\"pv_no_commments_placeholder_wrap\">\n    <div class=\"pv_no_commments_placeholder no_rows unshown\">Be the first to comment on this photo.\n    <div class=\"pv_closed_commments_placeholder no_rows \">Commenting this photo is restricted.\n  \n",
@@ -154,13 +161,17 @@ for photo, mail in zip(photos, mails_file):
     # "author_photo":"\/images\/camera_50.png",
     # "author_href":"\/mister.cat",
 
-        # todo:: mb just try to parse json and if any problem catch exception and then work with hidden_trash?
         jsons = []
         for raw in raw_jsons:
-            if (len(re.findall("\"id\":\"-+\d+_\d+\"", raw)) > 0):
-                print("Не удалось скачать изображение: " + re.findall("\"id\":\"-+\d+_\d+\"", raw).pop())
-                print("Пока нет возможности скачать изображения присланные из сообществ\n")
-                # todo:: add saving broken id to file
+            id_str_with_minus = re.findall("\"id\":\"-\d+_\d+\"", raw)
+            if (len(id_str_with_minus) > 0):
+                try:
+                    id = id_str_with_minus.pop().split(":")[1].replace("\"", "")
+                    fixed_json_regex = r"""{"id":"{1}""" + re.escape(id) + r".+?\"o_??.+?]}"
+                    fixed_jsons = re.findall(fixed_json_regex, response.text)
+                    [jsons.append(json.loads(fixed_json)) for fixed_json in fixed_jsons]
+                except:
+                    print("Не удалось скачать изображение присланное из сообщества: " + id)
             else:
                 hidden_trash = re.findall("<[^@]+>", raw)
                 h_trash = hidden_trash.pop()
